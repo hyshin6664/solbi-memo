@@ -30,8 +30,24 @@ main{margin:14px;padding:18px 18px 22px;background:rgba(255,255,255,.96);border-
 .status.info{background:#dbeafe;color:#0c4a6e}
 .status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
 
-textarea{width:100%;flex:1;min-height:160px;padding:14px;border:1.5px solid #ddd6fe;border-radius:14px;font-family:inherit;font-size:16px;line-height:1.6;color:#1e1b4b;background:#faf5ff;resize:none;outline:none;transition:border-color .15s;-webkit-appearance:none}
-textarea:focus{border-color:#7c3aed;background:#fff}
+/* 🎤 음성 입력 전용 UI — 키보드 비활성 */
+.mic-area{flex:1;display:flex;flex-direction:column;gap:12px;min-height:240px}
+.mic-btn{width:100%;padding:36px 18px;border:none;border-radius:18px;background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;font-family:inherit;font-size:18px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:14px;box-shadow:0 12px 28px rgba(124,58,237,.35);transition:transform .12s,box-shadow .2s;-webkit-appearance:none}
+.mic-btn:active{transform:scale(.97)}
+.mic-btn .mic-ico{font-size:42px;line-height:1}
+.mic-btn.listening{background:linear-gradient(135deg,#dc2626,#f59e0b);animation:pulseMic 1.1s ease-in-out infinite}
+@keyframes pulseMic{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.55)}50%{box-shadow:0 0 0 18px rgba(220,38,38,0)}}
+.mic-btn .mic-label{font-size:18px;font-weight:900;letter-spacing:-.3px}
+.mic-btn .mic-hint{font-size:11px;font-weight:700;opacity:.9;margin-top:2px}
+
+.transcript{flex:1;min-height:140px;padding:16px;border:1.5px solid #ddd6fe;border-radius:14px;background:#faf5ff;font-size:17px;line-height:1.6;color:#1e1b4b;overflow-y:auto;white-space:pre-wrap;word-break:break-word;font-family:inherit;-webkit-user-select:text;user-select:text}
+.transcript:empty::before{content:"🎤 위 마이크 버튼을 눌러 말하면 여기에 텍스트가 채워집니다.";color:#a78bfa;font-weight:600;font-size:14px;font-style:italic}
+.transcript .interim{color:#a78bfa;font-style:italic}
+
+.mic-row{display:flex;gap:8px;margin-top:-4px}
+.btn-mini{flex:1;padding:10px 8px;border:1.5px solid #ddd6fe;border-radius:10px;background:#fff;color:#6b21a8;font-family:inherit;font-size:12.5px;font-weight:800;cursor:pointer;-webkit-appearance:none}
+.btn-mini:active{background:#f5f3ff;transform:scale(.97)}
+.btn-mini.danger{color:#dc2626;border-color:#fecaca}
 
 .attach-row{display:flex;gap:8px;margin-top:10px}
 .attach-btn{flex:1;padding:14px 8px;border:1.5px dashed #c4b5fd;border-radius:12px;background:rgba(168,85,247,.06);color:#6b21a8;font-size:13px;font-weight:800;text-align:center;cursor:pointer;transition:all .15s}
@@ -72,7 +88,20 @@ footer{text-align:center;font-size:10.5px;color:#fff;opacity:.7;padding:12px 20p
     <span class="dot"></span><span id="statusText">준비됨</span>
   </div>
 
-  <textarea id="text" placeholder="여기에 메모 입력...&#10;&#10;예) 미타원 5층 미팅 — 오후 3시"></textarea>
+  <div class="mic-area">
+    <button class="mic-btn" id="btnMic" type="button">
+      <span class="mic-ico" id="micIco">🎤</span>
+      <span>
+        <span class="mic-label" id="micLabel">눌러서 말하기</span><br>
+        <span class="mic-hint" id="micHint">키보드 없이 음성만 — 한국어 자동 인식</span>
+      </span>
+    </button>
+    <div class="transcript" id="transcript" aria-live="polite"></div>
+    <div class="mic-row">
+      <button class="btn-mini" id="btnAppend" type="button">＋ 이어서 말하기</button>
+      <button class="btn-mini danger" id="btnReset" type="button">↻ 다시 시작</button>
+    </div>
+  </div>
 
   <div class="attach-row">
     <label class="attach-btn">
@@ -98,7 +127,7 @@ footer{text-align:center;font-size:10.5px;color:#fff;opacity:.7;padding:12px 20p
 
 </main>
 
-<footer>CDN &amp; Cloud is by Solbox.. · 솔비 메모 v1.0</footer>
+<footer>CDN &amp; Cloud is by Solbox.. · 솔비 메모 v1.1 (음성 전용)</footer>
 
 <div class="toast" id="toast"></div>
 
@@ -112,6 +141,9 @@ const LOC_KEY = 'solbi-memo-lastloc-v1';
 const $ = id => document.getElementById(id);
 let attachments = [];
 let currentLocation = null;
+let finalTranscript = '';  // 최종 누적 음성 텍스트
+let recog = null;
+let listening = false;
 
 function setStatus(text, kind){
   $('status').className = 'status ' + (kind||'info');
@@ -172,6 +204,106 @@ function fetchLocation(){
     {maximumAge: 5*60*1000, timeout: 8000, enableHighAccuracy: false}
   );
 }
+
+// === 🎤 음성 인식 (Web Speech API · 키보드 X) ===
+function renderTranscript(interim){
+  const el = $('transcript');
+  if (interim) {
+    el.innerHTML = (finalTranscript ? finalTranscript.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[c]) + ' ' : '') + '<span class="interim">' + interim.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[c]) + '</span>';
+  } else {
+    el.textContent = finalTranscript;
+  }
+}
+function setMicState(state){
+  const btn = $('btnMic');
+  const ico = $('micIco');
+  const lbl = $('micLabel');
+  const hint = $('micHint');
+  if (state === 'listening') {
+    btn.classList.add('listening');
+    ico.textContent = '⏹';
+    lbl.textContent = '말하는 중... (탭하면 종료)';
+    hint.textContent = '말 멈추면 자동 종료';
+  } else {
+    btn.classList.remove('listening');
+    ico.textContent = '🎤';
+    lbl.textContent = finalTranscript ? '＋ 더 말하기' : '눌러서 말하기';
+    hint.textContent = '키보드 없이 음성만 — 한국어 자동 인식';
+  }
+}
+function makeRecog(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  const r = new SR();
+  r.lang = 'ko-KR';
+  r.continuous = true;
+  r.interimResults = true;
+  r.maxAlternatives = 1;
+  let interim = '';
+  r.onresult = (e) => {
+    interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const tx = e.results[i][0].transcript;
+      if (e.results[i].isFinal) {
+        finalTranscript = (finalTranscript + ' ' + tx).trim();
+      } else {
+        interim += tx;
+      }
+    }
+    renderTranscript(interim);
+  };
+  r.onend = () => {
+    listening = false;
+    setMicState('idle');
+    renderTranscript('');
+  };
+  r.onerror = (e) => {
+    listening = false;
+    setMicState('idle');
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      toast('🎤 마이크 권한을 허용해주세요');
+      setStatus('🎤 마이크 권한 거부됨', 'err');
+    } else if (e.error === 'no-speech') {
+      toast('말이 안 들렸어요 — 다시 시도');
+    } else {
+      toast('음성 인식 오류: ' + e.error);
+    }
+  };
+  return r;
+}
+function startListen(){
+  if (!recog) recog = makeRecog();
+  if (!recog) {
+    toast('이 브라우저는 음성 인식 미지원 — Chrome 권장');
+    setStatus('❌ 음성 인식 미지원', 'err');
+    return;
+  }
+  try {
+    recog.start();
+    listening = true;
+    setMicState('listening');
+  } catch(e) {
+    // 이미 실행 중인 경우 무시
+  }
+}
+function stopListen(){
+  if (recog && listening) {
+    try { recog.stop(); } catch(_){}
+  }
+}
+$('btnMic').addEventListener('click', () => {
+  if (listening) stopListen();
+  else startListen();
+});
+$('btnAppend').addEventListener('click', () => {
+  if (!listening) startListen();
+});
+$('btnReset').addEventListener('click', () => {
+  finalTranscript = '';
+  renderTranscript('');
+  setMicState('idle');
+  if (listening) stopListen();
+});
 
 // === 첨부 ===
 function renderAtt(){
@@ -251,7 +383,8 @@ async function flushQueue(){
 
 // === 저장 ===
 $('btnSave').addEventListener('click', async () => {
-  const text = $('text').value.trim();
+  if (listening) stopListen();
+  const text = (finalTranscript || '').trim();
   if (!text && attachments.length === 0) {
     toast('빈 메모는 저장 불가');
     return;
@@ -285,7 +418,9 @@ $('btnSave').addEventListener('click', async () => {
 
   // 낙관적 UI: 입력 즉시 비움
   const snapshotText = text;
-  $('text').value = '';
+  finalTranscript = '';
+  renderTranscript('');
+  setMicState('idle');
   attachments = [];
   renderAtt();
 
@@ -313,12 +448,23 @@ $('btnSave').addEventListener('click', async () => {
   }
 });
 
+// 비우기: 더블탭 안전장치 (1.5초 내 두 번 탭)
+let _clearArm = 0;
 $('btnClear').addEventListener('click', () => {
-  if (!$('text').value && attachments.length === 0) return;
-  if (!confirm('비울까요?')) return;
-  $('text').value = '';
-  attachments = [];
-  renderAtt();
+  if (!finalTranscript && attachments.length === 0) return;
+  const now = Date.now();
+  if (now - _clearArm < 1500) {
+    if (listening) stopListen();
+    finalTranscript = '';
+    renderTranscript('');
+    setMicState('idle');
+    attachments = [];
+    renderAtt();
+    _clearArm = 0;
+  } else {
+    _clearArm = now;
+    toast('한 번 더 탭하면 비웁니다');
+  }
 });
 
 // === 온라인 복귀 자동 flush ===
