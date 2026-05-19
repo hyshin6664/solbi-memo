@@ -127,7 +127,7 @@ footer{text-align:center;font-size:10.5px;color:#fff;opacity:.7;padding:12px 20p
 
 </main>
 
-<footer>CDN &amp; Cloud is by Solbox.. · 솔비 메모 v1.1 (음성 전용)</footer>
+<footer>CDN &amp; Cloud is by Solbox.. · 솔비 메모 v1.2 (GPS 고정밀)</footer>
 
 <div class="toast" id="toast"></div>
 
@@ -201,7 +201,7 @@ function fetchLocation(){
       saveLastLoc(currentLocation);
     },
     err => { /* 권한 거부·실패 무시 — 캐시 있으면 그거 사용, 없으면 null */ },
-    {maximumAge: 5*60*1000, timeout: 8000, enableHighAccuracy: false}
+    {maximumAge: 60*1000, timeout: 15000, enableHighAccuracy: true}
   );
 }
 
