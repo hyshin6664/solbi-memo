@@ -1,0 +1,17 @@
+{
+  "name": "솔비 메모",
+  "short_name": "메모",
+  "description": "솔비 빠른 메모 — 텍스트·사진·위치 한 번에 저장",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#7c3aed",
+  "theme_color": "#7c3aed",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

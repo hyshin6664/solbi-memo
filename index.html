@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>솔비 메모</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="솔비 메모">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;font-family:"Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,sans-serif;color:#1e1b4b;min-height:100vh;background:linear-gradient(135deg,#7c3aed 0%,#ec4899 50%,#f59e0b 100%);background-attachment:fixed;-webkit-font-smoothing:antialiased}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+
+header{padding:24px 20px 8px;color:#fff;text-align:center}
+h1{margin:0;font-size:24px;font-weight:900;letter-spacing:-.5px;text-shadow:0 2px 8px rgba(0,0,0,.2)}
+.sub{font-size:12px;font-weight:700;opacity:.92;margin-top:4px}
+
+main{margin:14px;padding:18px 18px 22px;background:rgba(255,255,255,.96);border-radius:22px;box-shadow:0 16px 40px rgba(0,0,0,.18);min-height:calc(100vh - 120px);display:flex;flex-direction:column}
+
+.status{font-size:11px;font-weight:800;padding:8px 12px;border-radius:10px;text-align:center;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px}
+.status.ok{background:#dcfce7;color:#14532d}
+.status.warn{background:#fef3c7;color:#78350f}
+.status.err{background:#fee2e2;color:#7f1d1d}
+.status.info{background:#dbeafe;color:#0c4a6e}
+.status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block}
+
+textarea{width:100%;flex:1;min-height:160px;padding:14px;border:1.5px solid #ddd6fe;border-radius:14px;font-family:inherit;font-size:16px;line-height:1.6;color:#1e1b4b;background:#faf5ff;resize:none;outline:none;transition:border-color .15s;-webkit-appearance:none}
+textarea:focus{border-color:#7c3aed;background:#fff}
+
+.attach-row{display:flex;gap:8px;margin-top:10px}
+.attach-btn{flex:1;padding:14px 8px;border:1.5px dashed #c4b5fd;border-radius:12px;background:rgba(168,85,247,.06);color:#6b21a8;font-size:13px;font-weight:800;text-align:center;cursor:pointer;transition:all .15s}
+.attach-btn:active{background:rgba(168,85,247,.18);transform:scale(.97)}
+.attach-btn input{display:none}
+
+.attached-list{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.att-item{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;font-size:12.5px}
+.att-item .nm{flex:1;font-weight:700;color:#4c1d95;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-item .sz{color:#7c3aed;font-size:11px;font-weight:700}
+.att-item button{background:rgba(220,38,38,.12);border:none;color:#dc2626;cursor:pointer;border-radius:6px;padding:4px 8px;font-weight:800;font-size:11px}
+
+.save-row{display:flex;gap:8px;margin-top:14px}
+.btn{font-family:inherit;font-size:16px;font-weight:900;border:none;cursor:pointer;border-radius:14px;padding:16px 18px;transition:transform .12s,box-shadow .2s;display:inline-flex;align-items:center;justify-content:center;gap:6px;-webkit-appearance:none}
+.btn:active{transform:scale(.97)}
+.btn.primary{flex:1;background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;box-shadow:0 8px 20px rgba(124,58,237,.35)}
+.btn.ghost{background:#f3f4f6;color:#4b5563;padding:16px 16px}
+
+.queue-info{margin-top:14px;padding:10px 14px;background:#fef3c7;border-left:3px solid #d97706;border-radius:8px;font-size:12px;color:#78350f;font-weight:700;display:none}
+.queue-info.show{display:block}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(80px);background:rgba(15,23,42,.94);color:#fff;padding:14px 22px;border-radius:14px;font-size:14px;font-weight:700;opacity:0;transition:all .3s;z-index:200;max-width:90vw;text-align:center;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+footer{text-align:center;font-size:10.5px;color:#fff;opacity:.7;padding:12px 20px;font-weight:700}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📝 솔비 메모</h1>
+  <div class="sub">텍스트 · 사진 · 위치 · 즉시 저장</div>
+</header>
+
+<main>
+
+  <div class="status info" id="status">
+    <span class="dot"></span><span id="statusText">준비됨</span>
+  </div>
+
+  <textarea id="text" placeholder="여기에 메모 입력...&#10;&#10;예) 미타원 5층 미팅 — 오후 3시"></textarea>
+
+  <div class="attach-row">
+    <label class="attach-btn">
+      📷 사진
+      <input type="file" id="fImg" accept="image/*" capture="environment" multiple>
+    </label>
+    <label class="attach-btn">
+      📎 파일
+      <input type="file" id="fAny" multiple>
+    </label>
+  </div>
+
+  <div class="attached-list" id="attList"></div>
+
+  <div class="save-row">
+    <button class="btn primary" id="btnSave">💾 저장</button>
+    <button class="btn ghost" id="btnClear">✕</button>
+  </div>
+
+  <div class="queue-info" id="qInfo">
+    📥 대기 중 메모 <b id="qCount">0</b>건 — 온라인 복귀 시 자동 전송
+  </div>
+
+</main>
+
+<footer>CDN &amp; Cloud is by Solbox.. · 솔비 메모 v1.0</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const SOLBI_URL = 'https://script.google.com/a/macros/solbox.com/s/AKfycbwDV-kuZ7YC3xLIaomLzCxQ0doaBAmWVKHfVyZnwlnwUbAvne_xRSZHauLJmqF0LTC6/exec?api=saveMemo';
+const DASH_SECRET = 'sb_memo_2026_h7y3sh1n_x9k2m4n8p';
+const Q_KEY = 'solbi-memo-queue-v1';
+const LOC_KEY = 'solbi-memo-lastloc-v1';
+
+const $ = id => document.getElementById(id);
+let attachments = [];
+let currentLocation = null;
+
+function setStatus(text, kind){
+  $('status').className = 'status ' + (kind||'info');
+  $('statusText').textContent = text;
+}
+function toast(msg, ms){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tm);
+  t._tm = setTimeout(()=>t.classList.remove('show'), ms||2400);
+}
+function fmtSize(n){
+  if (n < 1024) return n+'B';
+  if (n < 1024*1024) return (n/1024).toFixed(1)+'KB';
+  return (n/1024/1024).toFixed(2)+'MB';
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+function nowStamp(){
+  const d = new Date();
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'_'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds());
+}
+function blobToB64(blob){
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res((r.result+'').split(',')[1] || '');
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+
+// === 위치 자동 (요구사항: 어떠한 경우에도 같이 저장) ===
+function loadLastLoc(){
+  try {
+    const raw = localStorage.getItem(LOC_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (Date.now() - obj.ts > 30*60*1000) return null; // 30분 TTL
+    return obj;
+  } catch { return null; }
+}
+function saveLastLoc(loc){
+  try { localStorage.setItem(LOC_KEY, JSON.stringify(Object.assign({ts:Date.now()}, loc))); } catch {}
+}
+function fetchLocation(){
+  // 캐시 우선
+  const cached = loadLastLoc();
+  if (cached) {
+    currentLocation = {lat:cached.lat, lng:cached.lng, accuracy:cached.accuracy, capturedAt:new Date(cached.ts).toISOString()};
+  }
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      currentLocation = {lat:p.coords.latitude, lng:p.coords.longitude, accuracy:Math.round(p.coords.accuracy), capturedAt:new Date().toISOString()};
+      saveLastLoc(currentLocation);
+    },
+    err => { /* 권한 거부·실패 무시 — 캐시 있으면 그거 사용, 없으면 null */ },
+    {maximumAge: 5*60*1000, timeout: 8000, enableHighAccuracy: false}
+  );
+}
+
+// === 첨부 ===
+function renderAtt(){
+  const wrap = $('attList');
+  wrap.innerHTML = '';
+  attachments.forEach((a, i) => {
+    const row = document.createElement('div');
+    row.className = 'att-item';
+    const icon = a.type.startsWith('image/') ? '🖼' : a.type.startsWith('video/') ? '🎬' : '📎';
+    row.innerHTML = '<span style="font-size:18px">'+icon+'</span><div class="nm"></div><div class="sz"></div><button data-i="'+i+'">제거</button>';
+    row.querySelector('.nm').textContent = a.name;
+    row.querySelector('.sz').textContent = fmtSize(a.size);
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      attachments.splice(+b.dataset.i, 1);
+      renderAtt();
+    });
+  });
+}
+function addFiles(list){
+  for (const f of list) {
+    attachments.push({name:f.name, blob:f, type:f.type||'application/octet-stream', size:f.size});
+  }
+  renderAtt();
+}
+$('fImg').addEventListener('change', e => addFiles(e.target.files));
+$('fAny').addEventListener('change', e => addFiles(e.target.files));
+
+// === 큐 (오프라인 / 실패 보관) ===
+function loadQueue(){
+  try { return JSON.parse(localStorage.getItem(Q_KEY) || '[]'); } catch { return []; }
+}
+function saveQueue(q){
+  try { localStorage.setItem(Q_KEY, JSON.stringify(q)); } catch {}
+}
+function refreshQueueUI(){
+  const q = loadQueue();
+  $('qCount').textContent = q.length;
+  $('qInfo').classList.toggle('show', q.length > 0);
+}
+
+// === 전송 ===
+async function sendOne(payload){
+  // text/plain → CORS preflight 회피 (response opaque, 낙관적 처리)
+  await fetch(SOLBI_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: {'Content-Type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify(payload)
+  });
+}
+
+async function flushQueue(){
+  if (!navigator.onLine) return;
+  const q = loadQueue();
+  if (q.length === 0) return;
+  setStatus('☁ 대기 메모 '+q.length+'건 전송 중...', 'info');
+  const remain = [];
+  for (const item of q) {
+    try {
+      await sendOne(item);
+    } catch(e) {
+      remain.push(item);
+    }
+  }
+  saveQueue(remain);
+  refreshQueueUI();
+  if (remain.length === 0) {
+    setStatus('✅ 모두 전송 완료', 'ok');
+    toast('☁ 대기 메모 전송 완료');
+  } else {
+    setStatus('⚠ '+remain.length+'건 재시도 대기', 'warn');
+  }
+}
+
+// === 저장 ===
+$('btnSave').addEventListener('click', async () => {
+  const text = $('text').value.trim();
+  if (!text && attachments.length === 0) {
+    toast('빈 메모는 저장 불가');
+    return;
+  }
+  // 위치 한 번 더 최신화 시도 (비동기, 결과 안 기다림)
+  fetchLocation();
+
+  setStatus('☁ 전송 중...', 'info');
+
+  // 첨부 base64
+  const files = [];
+  try {
+    for (const a of attachments) {
+      const b64 = await blobToB64(a.blob);
+      files.push({name:a.name, mime:a.type, base64:b64});
+    }
+  } catch(e) {
+    setStatus('❌ 첨부 인코딩 실패', 'err');
+    toast('첨부 인코딩 실패');
+    return;
+  }
+
+  const payload = {
+    text: text,
+    source: 'solbi-memo-pwa',
+    files: files,
+    location: currentLocation, // 자동, 없으면 null
+    dashSecret: DASH_SECRET,
+    capturedAt: new Date().toISOString()
+  };
+
+  // 낙관적 UI: 입력 즉시 비움
+  const snapshotText = text;
+  $('text').value = '';
+  attachments = [];
+  renderAtt();
+
+  if (navigator.onLine) {
+    try {
+      await sendOne(payload);
+      setStatus('✅ 저장 완료', 'ok');
+      toast('✅ 솔비 메모큐 저장 완료');
+    } catch(e) {
+      // 네트워크 죽으면 큐로
+      const q = loadQueue();
+      q.push(payload);
+      saveQueue(q);
+      refreshQueueUI();
+      setStatus('📥 오프라인 — 대기 큐에 보관', 'warn');
+      toast('대기 큐에 보관됨');
+    }
+  } else {
+    const q = loadQueue();
+    q.push(payload);
+    saveQueue(q);
+    refreshQueueUI();
+    setStatus('📥 오프라인 — 대기 큐에 보관 ('+q.length+')', 'warn');
+    toast('오프라인 — 대기 큐에 보관');
+  }
+});
+
+$('btnClear').addEventListener('click', () => {
+  if (!$('text').value && attachments.length === 0) return;
+  if (!confirm('비울까요?')) return;
+  $('text').value = '';
+  attachments = [];
+  renderAtt();
+});
+
+// === 온라인 복귀 자동 flush ===
+window.addEventListener('online', () => {
+  setStatus('🌐 온라인 복귀 — 대기 큐 flush', 'info');
+  setTimeout(flushQueue, 500);
+});
+window.addEventListener('offline', () => {
+  setStatus('📥 오프라인 — 저장은 됩니다 (큐 보관)', 'warn');
+});
+
+// === Service Worker 등록 ===
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+
+// === 초기 ===
+fetchLocation();
+refreshQueueUI();
+// 페이지 진입 시 대기 큐 자동 flush
+if (navigator.onLine) setTimeout(flushQueue, 1500);
+setStatus(navigator.onLine ? '✓ 준비됨' : '📥 오프라인 — 큐 모드', navigator.onLine ? 'ok' : 'warn');
+</script>
+
+</body>
+</html>
