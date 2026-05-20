@@ -1,6 +1,6 @@
 // 솔비 메모 Service Worker — 오프라인 셸 + 메모 큐 동기화
-// v2.2 (2026-05-20) — STT 무한 듣기 (저장 누를 때까지 침묵·끊김·안내 없이 매끄럽게)
-const CACHE = 'solbi-memo-v2.2-infinite-listen';
+// v2.3 (2026-05-20) — 무한 듣기 + 이전 세션 텍스트 보존 (자동 재시작 시 덮어쓰기 버그 해결)
+const CACHE = 'solbi-memo-v2.3-preserve-text';
 const SHELL = [
   './',
   './index.html',

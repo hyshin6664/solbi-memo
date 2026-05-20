@@ -127,7 +127,7 @@ footer{text-align:center;font-size:10.5px;color:#fff;opacity:.7;padding:12px 20p
 
 </main>
 
-<footer>CDN &amp; Cloud is by Solbox.. · 솔비 메모 <b style="color:#7c3aed">v2.2</b> (2026-05-20 · 저장 누를 때까지 무한 듣기 + STT 중복 dedup)</footer>
+<footer>CDN &amp; Cloud is by Solbox.. · 솔비 메모 <b style="color:#7c3aed">v2.3</b> (2026-05-20 · 무한 듣기 + 이전 텍스트 보존 + 중복 dedup)</footer>
 
 <div class="toast" id="toast"></div>
 
@@ -240,10 +240,9 @@ function makeRecog(){
   r.interimResults = true;
   r.maxAlternatives = 1;
   let interim = '';
-  // 🐛 fix 2026-05-20 v2: prefix-dedup 알고리즘 — Android Chrome이 누적 prefix를 final로 재emit하는 패턴 처리
-  // 패턴: "오영택시" → "오영택시 관련해서" → "오영택시 관련해서 엔진" ... 모두 isFinal:true
-  // 단순 join 시 "오영택시 오영택시 관련해서 오영택시 관련해서 엔진" 같은 중복 발생
-  // 해결: 마지막 final이 새 final의 prefix면 더 긴 버전으로 교체, 부분집합이면 무시, 둘 다 아니면 push
+  // 🐛 fix v2.3 (2026-05-20): 이전 세션 텍스트 보존 + prefix-dedup
+  // v2.2까지: onend 후 r.start() 재시작 시 새 e.results가 빈 상태로 시작 → finalTranscript 덮어써져 텍스트 사라짐
+  // 해결: sessionBase에 이번 세션 시작 전까지 누적된 텍스트 보관 → 새 세션 final은 sessionBase 뒤에 붙임
   r.onresult = (e) => {
     const finals = [];
     interim = '';
@@ -256,7 +255,7 @@ function makeRecog(){
           // 새 final이 이전 final의 확장형 — 교체
           finals[finals.length-1] = raw;
         } else if (last && last.startsWith(raw)) {
-          // 새 final이 이전 final의 부분집합 — 무시 (이미 더 긴 게 있음)
+          // 새 final이 이전 final의 부분집합 — 무시
         } else {
           finals.push(raw);
         }
@@ -264,34 +263,34 @@ function makeRecog(){
         interim += ' ' + raw;
       }
     }
-    finalTranscript = finals.join(' ').trim();
+    const thisSession = finals.join(' ').trim();
+    finalTranscript = (sessionBase + (sessionBase && thisSession ? ' ' : '') + thisSession).trim();
     renderTranscript(interim.trim());
   };
-  // 🎤 2026-05-20 v2.2 — 저장 버튼 누를 때까지 무한 듣기 (침묵·끊김 무시, UI 깜빡임 X, 안내 X)
-  // 무한 루프 방지: 10초 내 10회 이상 재시작되면 안전 종료
+  // 🎤 v2.3 — 저장 누를 때까지 무한 듣기 + 이전 세션 텍스트 보존
   let restartTimes = [];
   r.onend = () => {
     if (userStopped) {
-      // 사용자가 진짜 종료 (저장·중지·리셋)
       listening = false;
       setMicState('idle');
       renderTranscript('');
       userStopped = false;
       restartTimes = [];
+      sessionBase = '';
       return;
     }
+    // 자동 재시작 직전 — 이번 세션까지 누적된 finalTranscript를 sessionBase로 옮김 (다음 세션 e.results 초기화 대비)
+    sessionBase = finalTranscript;
     // 무한 루프 방지
     const now = Date.now();
     restartTimes = restartTimes.filter(t => now - t < 10000);
     if (restartTimes.length >= 10) {
-      // 10초 내 10회 이상 = 마이크 권한·하드웨어 문제 — 안전 종료
       listening = false;
       setMicState('idle');
       toast('🎤 음성 인식이 불안정합니다 — 다시 시도해주세요');
       return;
     }
     restartTimes.push(now);
-    // listening 상태 유지 (UI 깜빡임 X) + 재시작
     const tryRestart = (delay) => {
       setTimeout(() => {
         try { r.start(); } catch(e) {
@@ -315,6 +314,7 @@ function makeRecog(){
   return r;
 }
 let userStopped = false;
+let sessionBase = ''; // 이전 세션들까지 누적된 finalTranscript (자동 재시작 시 보존)
 function startListen(){
   if (!recog) recog = makeRecog();
   if (!recog) {
@@ -322,9 +322,11 @@ function startListen(){
     setStatus('❌ 음성 인식 미지원', 'err');
     return;
   }
-  if (listening) return; // 이미 듣는 중 — 무시
+  if (listening) return;
   try {
     userStopped = false;
+    // 시작 시 sessionBase = 기존 finalTranscript (＋ 더 말하기 케이스에서도 보존)
+    sessionBase = finalTranscript || '';
     recog.start();
     listening = true;
     setMicState('listening');
