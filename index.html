@@ -240,17 +240,32 @@ function makeRecog(){
   r.interimResults = true;
   r.maxAlternatives = 1;
   let interim = '';
+  // 🐛 fix 2026-05-20 v2: prefix-dedup 알고리즘 — Android Chrome이 누적 prefix를 final로 재emit하는 패턴 처리
+  // 패턴: "오영택시" → "오영택시 관련해서" → "오영택시 관련해서 엔진" ... 모두 isFinal:true
+  // 단순 join 시 "오영택시 오영택시 관련해서 오영택시 관련해서 엔진" 같은 중복 발생
+  // 해결: 마지막 final이 새 final의 prefix면 더 긴 버전으로 교체, 부분집합이면 무시, 둘 다 아니면 push
   r.onresult = (e) => {
+    const finals = [];
     interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const tx = e.results[i][0].transcript;
+    for (let i = 0; i < e.results.length; i++) {
+      const raw = (e.results[i][0].transcript || '').trim();
+      if (!raw) continue;
       if (e.results[i].isFinal) {
-        finalTranscript = (finalTranscript + ' ' + tx).trim();
+        const last = finals.length ? finals[finals.length-1] : '';
+        if (last && raw.startsWith(last)) {
+          // 새 final이 이전 final의 확장형 — 교체
+          finals[finals.length-1] = raw;
+        } else if (last && last.startsWith(raw)) {
+          // 새 final이 이전 final의 부분집합 — 무시 (이미 더 긴 게 있음)
+        } else {
+          finals.push(raw);
+        }
       } else {
-        interim += tx;
+        interim += ' ' + raw;
       }
     }
-    renderTranscript(interim);
+    finalTranscript = finals.join(' ').trim();
+    renderTranscript(interim.trim());
   };
   r.onend = () => {
     listening = false;

@@ -1,6 +1,6 @@
 // 솔비 메모 Service Worker — 오프라인 셸 + 메모 큐 동기화
-// v1.0 (2026-05-19)
-const CACHE = 'solbi-memo-v1';
+// v2.0 (2026-05-20) — STT prefix-dedup 알고리즘 적용
+const CACHE = 'solbi-memo-v2-stt-dedup';
 const SHELL = [
   './',
   './index.html',
